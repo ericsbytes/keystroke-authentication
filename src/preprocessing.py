@@ -17,7 +17,7 @@ from collections import defaultdict
 #     for c, key in enumerate(row):
 #         KEYBOARD_LAYOUT[key] = (c, r)
 
-#---- STEP 1: DEFINE KEYBAORD LAYOUT ----
+#---- STEP 1: DEFINE KEYBOARD LAYOUT ----
 # OPTION 2: Manually defined coordinates
 KEYBOARD_LAYOUT = {
     #D1 is chosen to be (0, 0) for simplicity
