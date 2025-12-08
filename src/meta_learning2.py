@@ -15,7 +15,7 @@ class VerificationMetaTrainer:
     def __init__(self, encoder: DigraphCNN, k_shot: int, q_query: int, lr=1e-3):
         self.encoder = encoder
         self.k_shot = k_shot
-        self.q_query = q_query
+        self.q_query = q_query #number of windows per query
 
         self.loss_fn = tf.keras.losses.BinaryCrossentropy(from_logits=True)
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
@@ -29,12 +29,17 @@ class VerificationMetaTrainer:
 
     def create_episode(self, digraphs, user_sessions, num_genuine=2, num_impostor=2):
         """
-        Creates one verification episode:
+        Creates one verification episode with multiple windows per query sample.
+
         - pick a target user X
-        - sample k_shot support from X
-        - with equal probability, sample query as: 
-            - query is another sample from X (label=1)
-            - query is from a different user Y (label=0)
+        - sample k_shot support windows from X
+        - for each genuine query sample: sample `q_query` windows from X
+        - for each impostor query sample: sample `q_query` windows from some Y != X
+
+        Returns:
+            support: (k_shot, T, D)
+            query:   (num_samples * q_query, T, D), where num_samples = num_genuine + num_impostor
+            labels:  (num_samples, 1)   (1 = genuine, 0 = impostor)
         """
         users = list(user_sessions.keys())
         if len(users) < 2:
@@ -46,32 +51,66 @@ class VerificationMetaTrainer:
             raise ValueError("No users with enough sessions for this episode.")
         
         #step 1: choose target user X
+        valid_users = [
+            u for u in users
+            if len(user_sessions[u]) >= self.k_shot + num_genuine * self.q_query
+        ]
+        if not valid_users:
+            raise ValueError("No users with enough windows for this episode.")
+
         target_user = np.random.choice(valid_users)
         target_indices = user_sessions[target_user]
 
+
         #step 2: sample support + genuine query from target user X
-        sampled = np.random.choice(
+        support_idx = np.random.choice(
             target_indices,
-            self.k_shot + num_genuine,
+            self.k_shot,
             replace=False
         )
-        support_idx = sampled[:self.k_shot]
-        genuine_query_idx = sampled[self.k_shot:]
+        genuine_groups = []
+        remaining_for_genuine = list(
+            set(target_indices) - set(support_idx)
+        )
+        for _ in range(num_genuine):
+            if len(remaining_for_genuine) >= self.q_query:
+                group = np.random.choice(
+                    remaining_for_genuine, self.q_query, replace=False
+                )
+                # remove used ones, to reduce overlap between genuine samples
+                remaining_for_genuine = list(
+                    set(remaining_for_genuine) - set(group)
+                )
+            else:
+                group = np.random.choice(
+                    target_indices, self.q_query, replace=True
+                )
+            genuine_groups.append(group)
+
 
         #step 3: sample imposter indices from other users
         other_users = [u for u in users if u != target_user and len(user_sessions[u]) > 0]
         if not other_users:
             raise ValueError("No impostor users with sessions.")
         
-        imposter_indices = []
-        while len(imposter_indices) < num_impostor:
-            impostor_user = np.random.choice(other_users)
-            impostor_session = np.random.choice(user_sessions[impostor_user])
-            imposter_indices.append(impostor_session)
+        impostor_groups = []
+        for _ in range(num_impostor):
+            imp_user = np.random.choice(other_users)
+            imp_indices = user_sessions[imp_user]
+            if len(imp_indices) >= self.q_query:
+                group = np.random.choice(imp_indices, self.q_query, replace=False)
+            else:
+                group = np.random.choice(imp_indices, self.q_query, replace=True)
+            impostor_groups.append(group)
 
         #step 4: build samples
         support_samples = [digraphs[i] for i in support_idx]
-        query_indices = list(genuine_query_idx) + imposter_indices
+        query_indices = []
+        for group in genuine_groups:
+            query_indices.extend(list(group))
+        for group in impostor_groups:
+            query_indices.extend(list(group))
+
         query_samples = [digraphs[i] for i in query_indices]
 
         #step 5: pad to uniform length
@@ -81,8 +120,8 @@ class VerificationMetaTrainer:
         #labels: genuine, then imposters
         labels = [1] * num_genuine + [0] * num_impostor
         labels = tf.constant(labels, dtype=tf.float32)
-        labels = tf.reshape(labels, (-1, 1))
-        
+        labels = tf.reshape(labels, (-1, 1))  # (num_samples, 1)
+
         return support, query, labels
 
     def _pad_sequences(self, sequences):
@@ -112,11 +151,20 @@ class VerificationMetaTrainer:
         #step 2: prototype for user X = mean of support embeddings
         prototype = tf.reduce_mean(support_embeddings, axis=0, keepdims=True)
 
+        #reshape
+        total_q = tf.shape(query_embeddings)[0]
+        emb_dim = tf.shape(query_embeddings)[1]
+        q_windows = self.q_query
+
+        num_samples = total_q // q_windows
+        query_reshaped = tf.reshape(query_embeddings, (num_samples, q_windows, emb_dim))
+        query_sample_emb = tf.reduce_mean(query_reshaped, axis=1)  # (num_samples, E)
+
         #step 3: compute Euclidean distance between query and prototype
-        distances = tf.norm(query_embeddings - prototype, axis=1, keepdims=True)
+        distances = tf.norm(query_sample_emb - prototype, axis=1, keepdims=True)
 
         #step 4: pass distance through verification head to get probability logits
-        logits = self.verification_head(distances, training=training)
+        logits = self.verification_head(distances, training=training)  # (num_samples, 1)
 
         #step 5: return logits
         return logits, distances
@@ -171,9 +219,9 @@ class VerificationMetaTrainer:
             pbar.set_postfix({
                 'loss': f'{loss.numpy():.4f}',
                 'train_acc': f'{accuracy.numpy():.4f}',
-                'running_acc': f'{running_accuracy:.4f}',
-                'rolling_avg_acc': f'{rolling_avg_acc:.4f}',
-                'rolling_avg_loss': f'{rolling_avg_loss:.4f}'
+                'run_acc': f'{running_accuracy:.4f}',
+                'rol_acc': f'{rolling_avg_acc:.4f}',
+                'rol_loss': f'{rolling_avg_loss:.4f}'
             })
     
             if (episode + 1) % eval_interval == 0:

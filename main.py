@@ -66,7 +66,7 @@ def main():
         encoder=encoder,
         k_shot=2,
         lr=1e-3,
-        q_query=1
+        q_query=15, #prev: 10
     )
 
     num_episodes = 300
@@ -95,7 +95,7 @@ def main():
         X_test_norm,
         user_sessions_test,
         num_episodes=500,
-        threshold=0.9,
+        threshold=0.5,
     )
     
     print("Verification metrics on test set:")
