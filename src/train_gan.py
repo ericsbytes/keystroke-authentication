@@ -80,7 +80,7 @@ def main():
     print("\nCreating VAE-GAN model...")
     vae_gan = VAEGAN(
         input_dim=9,
-        latent_dim=64,
+        latent_dim=128,
         seq_len=max_len
     )
 
@@ -91,7 +91,7 @@ def main():
     history = vae_gan.fit(
         train_dataset,
         validation_data=val_dataset,
-        epochs=50,
+        epochs=100,
         verbose=1
     )
 

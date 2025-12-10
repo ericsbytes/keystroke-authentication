@@ -338,7 +338,7 @@ class VAEGAN(keras.Model):
             )
 
             # Total VAE loss
-            total_vae_loss = reconstruction_loss + kl_loss + 0.1 * vae_gan_loss
+            total_vae_loss = reconstruction_loss + kl_loss + 0.3 * vae_gan_loss
 
         # Update VAE (encoder + decoder)
         vae_vars = self.encoder.trainable_variables + self.decoder.trainable_variables
@@ -429,7 +429,7 @@ if __name__ == "__main__":
     print("\n=== Testing VAE-GAN ===")
     vae_gan = VAEGAN(input_dim=INPUT_DIM,
                      latent_dim=LATENT_DIM, seq_len=SEQ_LEN)
-    vae_gan.compile(optimizer=keras.optimizers.Adam(1e-4))
+    vae_gan.compile(optimizer=keras.optimizers.Adam(5e-5))
 
     # Forward pass
     reconstructed, z_mean, z_log_var = vae_gan(dummy_data, training=False)

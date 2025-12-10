@@ -159,19 +159,35 @@ def visualize_embeddings_umap(encoder, X_data, user_sessions, num_users=10, samp
     return embeddings_2d, labels
 
 
-def plot_training_history(history, save_path=None):
+def plot_training_history(history, save_path=None, ema_alpha=0.1):
     """
-    Plot training history including loss and accuracies.
+    Plot training history with exponential moving average smoothing.
     
     Args:
         history: Dictionary with keys 'train_losses', 'train_accs', 'val_accs'
         save_path: Path to save the figure (optional)
+        ema_alpha: Smoothing factor (0-1). Lower = smoother. Default: 0.1
     """
+    def exponential_smooth(data, alpha):
+        """Apply exponential moving average"""
+        smoothed = np.zeros_like(data)
+        smoothed[0] = data[0]
+        for i in range(1, len(data)):
+            smoothed[i] = alpha * data[i] + (1 - alpha) * smoothed[i-1]
+        return smoothed
+    
     plt.figure(figsize=(15, 5))
     
     # Loss plot
     plt.subplot(1, 3, 1)
-    plt.plot(history['train_losses'], label='Train Loss', alpha=0.7, linewidth=2)
+    train_losses = np.array(history['train_losses'])
+    episodes = np.arange(len(train_losses))
+    
+    plt.plot(episodes, train_losses, alpha=0.2, color='blue', linewidth=0.5, label='Raw')
+    smoothed_losses = exponential_smooth(train_losses, ema_alpha)
+    plt.plot(episodes, smoothed_losses, alpha=0.9, color='blue', linewidth=2, 
+             label=f'EMA (α={ema_alpha})')
+    
     plt.xlabel('Episode', fontsize=12)
     plt.ylabel('Loss', fontsize=12)
     plt.title('Training Loss over Episodes', fontsize=14, fontweight='bold')
@@ -180,18 +196,27 @@ def plot_training_history(history, save_path=None):
     
     # Training accuracy plot
     plt.subplot(1, 3, 2)
-    plt.plot(history['train_accs'], label='Train Accuracy', color='orange', linewidth=2)
+    train_accs = np.array(history['train_accs'])
+    
+    plt.plot(episodes, train_accs, alpha=0.2, color='orange', linewidth=0.5, label='Raw')
+    smoothed_accs = exponential_smooth(train_accs, ema_alpha)
+    plt.plot(episodes, smoothed_accs, alpha=0.9, color='orange', linewidth=2, 
+             label=f'EMA (α={ema_alpha})')
+    
     plt.xlabel('Episode', fontsize=12)
     plt.ylabel('Accuracy', fontsize=12)
     plt.title('Training Accuracy over Episodes', fontsize=14, fontweight='bold')
     plt.legend()
     plt.grid(True, alpha=0.3)
     
-    # Validation accuracy plot
+    # Validation accuracy plot (no smoothing needed - already sparse)
     plt.subplot(1, 3, 3)
-    episodes = np.arange(0, len(history['val_accs'])) * 100  # Assumes eval_interval = 100
-    plt.plot(episodes, history['val_accs'], label='Validation Accuracy', 
-             color='green', marker='o', markersize=3, linewidth=2)
+    val_accs = np.array(history['val_accs'])
+    episodes = np.arange(len(val_accs)) * 100
+    
+    plt.plot(episodes, val_accs, alpha=0.9, color='green', 
+             marker='o', markersize=4, linewidth=2, label='Validation Accuracy')
+    
     plt.xlabel('Episode', fontsize=12)
     plt.ylabel('Accuracy', fontsize=12)
     plt.title('Validation Accuracy over Episodes', fontsize=14, fontweight='bold')

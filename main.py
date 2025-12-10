@@ -22,10 +22,22 @@ DATA_ROOT = "data/UB_keystroke_dataset"
 OUTPUT_PATH = "processed_keystrokes.pkl"
 
 
-def augment_user_data(vae_gan, user_samples, num_synthetic):
+def augment_user_data(vae_gan, user_samples, num_synthetic, max_seq_len):
     """Generate synthetic samples for a user using the trained VAE-GAN."""
+    # Pad user samples to max_seq_len
+    padded_samples = []
+    for sample in user_samples:
+        if sample.shape[0] < max_seq_len:
+            # Pad with zeros
+            padding = np.zeros((max_seq_len - sample.shape[0], sample.shape[1]), dtype=np.float32)
+            padded_sample = np.vstack([sample, padding])
+        else:
+            # Truncate if longer
+            padded_sample = sample[:max_seq_len]
+        padded_samples.append(padded_sample)
+    
     # Stack user samples into a batch
-    user_batch = np.array(user_samples)
+    user_batch = np.array(padded_samples, dtype=np.float32)
     user_batch = tf.constant(user_batch, dtype=tf.float32)
     
     # Encode to get latent distribution
@@ -128,7 +140,7 @@ def main():
         if len(sessions) < MIN_SAMPLES:
             user_samples = [X_train_norm[i] for i in sessions]
             num_to_generate = MIN_SAMPLES - len(sessions)
-            synthetic = augment_user_data(vae_gan, user_samples, num_synthetic=num_to_generate)
+            synthetic = augment_user_data(vae_gan, user_samples, num_synthetic=num_to_generate, max_seq_len=max_seq_len)  # Add max_seq_len
             
             # Add synthetic samples to dataset
             # Each element in synthetic is already (seq_len, 9)
