@@ -34,12 +34,24 @@ class KeystrokeAuthGUI:
     def load_models(self):
         """Load trained encoder and verification head"""
         try:
+            # Create encoder
             self.encoder = DigraphCNN(input_dim=9, embedding_dim=128)
-            self.encoder.build(input_shape=(None, None, 9))
+            
+            # Build the model by passing dummy data
+            dummy_input = tf.zeros((1, 80, 9))
+            _ = self.encoder(dummy_input, training=False)
+            
+            # Now load weights
             self.encoder.load_weights('models/best/verification_encoder_weights.h5')
             
+            # Create trainer
             self.trainer = VerificationMetaTrainer(self.encoder, k_shot=2, q_query=15)
-            self.trainer.verification_head.build(input_shape=(None, 128))
+            
+            # Build verification head
+            dummy_embedding = tf.zeros((1, 128))
+            _ = self.trainer.verification_head(dummy_embedding, training=False)
+            
+            # Load verification head weights
             self.trainer.verification_head.load_weights('models/best/verification_head_weights.h5')
             
             print("✓ Models loaded successfully")
