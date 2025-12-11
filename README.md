@@ -1,5 +1,5 @@
-# Keystroke Authentication through Typing Patterns
+# 💻 Keystroke Authentication through Typing Patterns
 
-**By: Amber Bajaj (abjaj7), Hayzie Chu (nqchu), Eric Wu (ewu69)**
+**Amber Bajaj (abjaj7), Hayzie Chu (nqchu), Eric Wu (ewu69)**
 
-To be filled!
+<a href="Poster.pdf" class="image fit"><img src="assets/poster_img.png" alt=""></a>
