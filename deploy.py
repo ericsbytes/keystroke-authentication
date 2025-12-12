@@ -8,8 +8,8 @@ from collections import defaultdict
 import json
 
 from src.models import DigraphCNN
-from src.meta_learning2 import VerificationMetaTrainer
-from src.preprocessing import KeystrokeSession, get_spatial_distances
+from src.meta_learning import VerificationMetaTrainer
+from src.preprocessing import get_spatial_distances
 
 class KeystrokeAuthGUI:
     def __init__(self, root):

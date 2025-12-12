@@ -2,19 +2,14 @@ import os
 import pickle
 import tensorflow as tf
 import numpy as np
-from tqdm import tqdm
-from src.meta_learning import MetaLearningTrainer
-from src.meta_learning2 import VerificationMetaTrainer
+from src.meta_learning import VerificationMetaTrainer
 from src.models import DigraphCNN
 from src.gan import VAEGAN
 from src.preprocessing import build_datasets
 from src.normalization import fit_normalizer, apply_normalizer
-import matplotlib.pyplot as plt
 from src.visualization import (
     visualize_embeddings_tsne, 
-    visualize_embeddings_umap,
     plot_training_history,
-    plot_distance_distributions
 )
 
 # Make sure to change the below path to your local data path
@@ -62,18 +57,6 @@ def augment_user_data(vae_gan, user_samples, num_synthetic, max_seq_len):
 
 def main():
     # ---- STEP 1: PREPROCESS DATA, OR LOAD PREPROCESSED DATA ----
-    # if os.path.exists(OUTPUT_PATH):
-    #     with open(OUTPUT_PATH, "rb") as f:
-    #         data = pickle.load(f)
-
-    #     print("Loaded preprocessed data from", OUTPUT_PATH)
-
-    # else: #Preprocess from scratch
-    #     data = build_datasets(DATA_ROOT)
-    #     with open(OUTPUT_PATH, "wb") as f:
-    #         pickle.dump(data, f)
-
-    #     print("Created preprocessed data and saved to", OUTPUT_PATH)
     data = build_datasets(DATA_ROOT, window_size=80)
     X_train = data[0]
     y_train = data[1]
